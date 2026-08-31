@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/* ── Tokens de marca (ZXP Solutions / RUMO) ───────────────────────── */
+/* Mesmos valores da landing page: o painel é a mesma marca, vista por dentro. */
+:root {
+  --brand-onyx: #10100e;
+  --brand-onyx-raised: #16150f;
+  --brand-onyx-line: #23211a;
+  --brand-dourado: #f4b942;
+  --brand-dourado-claro: #ffd98a;
+  --brand-marfim: #f6f3e8;
+
+  --background: var(--brand-onyx);
+  --foreground: var(--brand-marfim);
+}
+
+@theme inline {
+  --color-onyx: var(--brand-onyx);
+  --color-onyx-raised: var(--brand-onyx-raised);
+  --color-onyx-line: var(--brand-onyx-line);
+  --color-dourado: var(--brand-dourado);
+  --color-dourado-claro: var(--brand-dourado-claro);
+  --color-marfim: var(--brand-marfim);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --font-display: var(--font-space-grotesk);
+  --font-sans: var(--font-inter);
+}
+
+/* ── Base ─────────────────────────────────────────────────────────── */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--brand-dourado);
+  color: var(--brand-onyx);
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-dourado);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ── Utilitários ──────────────────────────────────────────────────── */
+
+.card-destaque {
+  background:
+    linear-gradient(var(--brand-onyx-raised), var(--brand-onyx-raised))
+      padding-box,
+    linear-gradient(135deg, rgb(244 185 66 / 0.5), rgb(244 185 66 / 0.08))
+      border-box;
+  border: 1px solid transparent;
+}
+
+.glow-dourado {
+  background: radial-gradient(
+    ellipse 60% 50% at 50% 0%,
+    rgb(244 185 66 / 0.13),
+    transparent 70%
+  );
+}
+
+/* O <select> nativo herda o fundo claro do sistema em algumas plataformas e
+   fica ilegível sobre o onyx. Forçar as opções resolve sem trocar por um
+   dropdown customizado, que custaria acessibilidade no celular. */
+select option {
+  background-color: var(--brand-onyx-raised);
+  color: var(--brand-marfim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
