@@ -42,5 +42,8 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // `icon.svg` precisa ficar de fora: sem isso o proxy manda o pedido do
+  // favicon pro login, e a aba da própria tela de login fica sem logo.
+  // Ícone não é dado sensível — o que precisa de sessão é lead, não imagem.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg).*)"],
 };
