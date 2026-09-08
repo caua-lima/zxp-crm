@@ -1,22 +1,19 @@
 import Link from "next/link";
 
+import { Logo } from "@/components/Logo";
 import { sair } from "@/lib/acoes";
 
 export function Cabecalho() {
   return (
     <header className="sticky top-0 z-20 border-b border-onyx-line bg-onyx/95 backdrop-blur">
       <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-5 py-3">
+        {/* min-h-11 (44px) garante alvo de toque confortável no celular */}
         <Link
           href="/"
-          className="flex items-center gap-2.5"
-          aria-label="Painel de leads — início"
+          aria-label="ZXP CRM — todos os leads"
+          className="-mx-2 flex min-h-11 items-center rounded-lg px-2"
         >
-          <span className="flex size-8 items-center justify-center rounded-lg bg-dourado font-display text-base font-bold text-onyx">
-            Z
-          </span>
-          <span className="font-display text-sm font-bold tracking-wide text-marfim">
-            LEADS RUMO
-          </span>
+          <Logo compact />
         </Link>
 
         <form action={sair}>

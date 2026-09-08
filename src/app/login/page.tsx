@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { FormularioLogin } from "@/components/FormularioLogin";
+import { Logo } from "@/components/Logo";
 import { sessaoAtiva } from "@/lib/sessao";
 
 export default async function PaginaLogin() {
@@ -17,15 +18,9 @@ export default async function PaginaLogin() {
       />
 
       <div className="card-destaque relative w-full max-w-sm rounded-2xl p-7">
-        <p className="font-display text-xs font-semibold tracking-[0.2em] text-dourado">
-          ZXP SOLUTIONS
-        </p>
+        <Logo />
 
-        <h1 className="mt-2 font-display text-2xl font-bold text-marfim">
-          Painel de leads
-        </h1>
-
-        <p className="mt-2 mb-7 text-sm leading-relaxed text-marfim/50">
+        <p className="mt-6 mb-7 text-sm leading-relaxed text-marfim/50">
           Área restrita. Os dados aqui dentro são de pessoas reais — muitas
           delas menores de idade.
         </p>

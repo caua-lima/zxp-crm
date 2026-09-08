@@ -17,7 +17,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Painel de leads — RUMO",
+  title: "ZXP CRM",
+  description: "Painel de leads da RUMO — ZXP Solutions.",
   // O painel lista nome, telefone e relato pessoal de menores de idade.
   // Ele não pode ser indexado em hipótese alguma. O proxy também manda o
   // cabeçalho X-Robots-Tag, que cobre respostas que nem chegam a renderizar.
