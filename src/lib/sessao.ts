@@ -1,109 +1,184 @@
 import "server-only";
 
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+
 import { cookies } from "next/headers";
 
-import { DURACAO_SESSAO_MS, NOME_COOKIE_SESSAO } from "./constantes";
+import { bancoFetch, lerJson } from "./banco";
+import { configuracao } from "./config";
+import {
+  DURACAO_SESSAO_MS,
+  NOME_COOKIE_SESSAO,
+  formatoTokenValido,
+} from "./constantes";
+import { ErroCrm } from "./erros";
+import { registrar } from "./log";
 
 /**
- * Sessão de usuário único, assinada com HMAC-SHA256.
+ * Sessão de usuário único, REVOGÁVEL.
  *
- * Sem biblioteca de auth de propósito: é um usuário só, sem cadastro, sem
- * papéis e sem "esqueci minha senha". Um JWT assinado à mão com o `crypto` do
- * Node resolve isso em 40 linhas auditáveis, e menos dependência é menos
- * superfície de ataque num painel que expõe dado de menor de idade.
+ * O cookie guarda um identificador aleatório e opaco (32 bytes). O banco guarda
+ * só o HASH dele. Cada requisição autenticada consulta o banco: é isso que
+ * permite revogar uma sessão — logout, troca de senha e "sair de todos os
+ * dispositivos" passam a valer na hora, inclusive para uma cópia do cookie.
  *
- * O cookie NÃO guarda dado nenhum além da validade. Não há o que roubar dele:
- * quem tem o cookie está autenticado, quem não tem, não está.
+ * Sem biblioteca de auth e sem criptografia própria: o único segredo
+ * criptográfico é o HMAC que impede guardar a senha ou o IP em texto puro.
+ * Não há cadastro, papéis nem "esqueci minha senha": um usuário, uma senha.
+ *
+ * IMPORTANTE: o cookie É uma credencial. Quem o copiar entra no painel até a
+ * sessão ser revogada ou expirar — por isso a revogação existe.
  */
 
-function segredo() {
-  const valor = process.env.AUTH_SECRET;
-
-  // Falha alto e cedo. Um segredo curto (ou ausente) torna a assinatura
-  // forjável, e um painel que "funciona" nesse estado é pior que um fora do ar.
-  if (!valor || valor.length < 32) {
-    throw new Error(
-      "AUTH_SECRET ausente ou curto demais (mínimo 32 caracteres). " +
-        "Gere um com: openssl rand -base64 32",
-    );
-  }
-
-  return valor;
+export function gerarToken(): string {
+  return randomBytes(32).toString("base64url");
 }
 
-function assinar(payload: string) {
-  return createHmac("sha256", segredo()).update(payload).digest("base64url");
+export function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }
 
-/** Compara dois textos sem vazar, pelo tempo de resposta, onde eles diferem. */
-function iguaisEmTempoConstante(a: string, b: string) {
-  // O digest normaliza o comprimento: `timingSafeEqual` recusa buffers de
-  // tamanhos diferentes, e esse próprio erro já vazaria informação.
-  const ha = createHash("sha256").update(a).digest();
-  const hb = createHash("sha256").update(b).digest();
+/**
+ * Impressão digital da senha em uso. Cada sessão guarda a sua; mudar
+ * ADMIN_PASSWORD muda a impressão e derruba TODAS as sessões abertas, sem
+ * ninguém precisar lembrar de fazê-lo.
+ */
+export function impressaoCredencial(): string {
+  const { segredo, senhaAdmin } = configuracao();
 
-  return timingSafeEqual(ha, hb);
+  return createHmac("sha256", segredo).update(`credencial:v1:${senhaAdmin}`).digest("hex");
 }
 
-export function senhaConfere(fornecida: string) {
-  const esperada = process.env.ADMIN_PASSWORD;
+/** Compara senhas em tempo constante (o digest normaliza o comprimento). */
+export function senhaConfere(fornecida: string): boolean {
+  const { senhaAdmin } = configuracao();
 
-  if (!esperada) {
-    throw new Error("ADMIN_PASSWORD não configurada.");
-  }
+  const a = createHash("sha256").update(fornecida).digest();
+  const b = createHash("sha256").update(senhaAdmin).digest();
 
-  return iguaisEmTempoConstante(fornecida, esperada);
+  return timingSafeEqual(a, b);
 }
 
-function criarToken() {
-  const payload = Buffer.from(
-    JSON.stringify({ exp: Date.now() + DURACAO_SESSAO_MS }),
-  ).toString("base64url");
-
-  return `${payload}.${assinar(payload)}`;
+/** Opções do cookie de sessão. Exportada para os testes conferirem httpOnly/Secure/SameSite. */
+export function opcoesCookie() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: DURACAO_SESSAO_MS / 1000,
+  };
 }
 
-export function tokenValido(token: string | undefined) {
-  if (!token) return false;
+/** Abre uma sessão nova e a entrega no cookie. Lança ErroCrm se o banco falhar. */
+export async function abrirSessao(): Promise<void> {
+  const token = gerarToken();
 
-  const [payload, assinatura] = token.split(".");
-  if (!payload || !assinatura) return false;
+  await bancoFetch("sessao.criar", "crm_sessoes", {
+    metodo: "POST",
+    preferir: "return=minimal",
+    corpo: {
+      id_hash: hashToken(token),
+      credencial: impressaoCredencial(),
+      expira_em: new Date(Date.now() + DURACAO_SESSAO_MS).toISOString(),
+    },
+  });
 
-  if (!iguaisEmTempoConstante(assinatura, assinar(payload))) return false;
+  const cookieStore = await cookies();
+  cookieStore.set(NOME_COOKIE_SESSAO, token, opcoesCookie());
+
+  // Limpeza oportunista do que expirou há mais de 30 dias. Falhar aqui não pode
+  // atrapalhar um login que já deu certo.
+  const corte = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  await bancoFetch("sessao.limpar", `crm_sessoes?expira_em=lt.${encodeURIComponent(corte)}`, {
+    metodo: "DELETE",
+    preferir: "return=minimal",
+  }).catch(() => undefined);
+}
+
+/**
+ * Revoga a sessão do cookie atual e apaga o cookie. Devolve false se o servidor
+ * não conseguiu revogar (o cookie é apagado de qualquer jeito, mas uma cópia
+ * dele continuaria valendo — quem chama precisa avisar).
+ */
+export async function fecharSessao(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(NOME_COOKIE_SESSAO)?.value;
+
+  cookieStore.delete(NOME_COOKIE_SESSAO);
+
+  if (!formatoTokenValido(token)) return true;
 
   try {
-    const { exp } = JSON.parse(
-      Buffer.from(payload, "base64url").toString(),
-    ) as { exp?: unknown };
+    await bancoFetch(
+      "sessao.revogar",
+      `crm_sessoes?id_hash=eq.${hashToken(token)}&revogada_em=is.null`,
+      {
+        metodo: "PATCH",
+        preferir: "return=minimal",
+        corpo: { revogada_em: new Date().toISOString() },
+      },
+    );
 
-    return typeof exp === "number" && Date.now() < exp;
+    return true;
   } catch {
     return false;
   }
 }
 
-export async function abrirSessao() {
-  const cookieStore = await cookies();
-
-  cookieStore.set(NOME_COOKIE_SESSAO, criarToken(), {
-    httpOnly: true,
-    // Em desenvolvimento o localhost é http, e `secure` impediria o cookie de
-    // ser gravado. Em produção é sempre https.
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: DURACAO_SESSAO_MS / 1000,
+/** Revoga TODAS as sessões abertas (sair de todos os dispositivos). */
+export async function encerrarTodasAsSessoes(): Promise<void> {
+  await bancoFetch("sessao.revogar_todas", "crm_sessoes?revogada_em=is.null", {
+    metodo: "PATCH",
+    preferir: "return=minimal",
+    corpo: { revogada_em: new Date().toISOString() },
   });
 }
 
-export async function fecharSessao() {
+/**
+ * A sessão do cookie atual é válida AGORA? Consulta o banco a cada chamada.
+ *
+ * Devolve false para "não é válida" (sem cookie, formato errado, desconhecida,
+ * expirada, revogada, senha trocada). LANÇA ErroCrm quando não consegue
+ * verificar (banco fora do ar, projeto pausado, migration pendente).
+ *
+ * A distinção importa. Tratar "não consegui verificar" como "sessão inválida"
+ * mandaria o dono para a tela de login como se a senha tivesse expirado,
+ * quando na verdade o banco caiu. Nos dois casos NINGUÉM vê dado (falha
+ * fechada) — só muda o diagnóstico mostrado.
+ */
+export async function validarSessao(): Promise<boolean> {
   const cookieStore = await cookies();
-  cookieStore.delete(NOME_COOKIE_SESSAO);
+  const token = cookieStore.get(NOME_COOKIE_SESSAO)?.value;
+
+  // Formato errado (cookie do modelo antigo, lixo, cookie forjado) nem chega ao banco.
+  if (!formatoTokenValido(token)) return false;
+
+  const agora = new Date().toISOString();
+  const resposta = await bancoFetch(
+    "sessao.validar",
+    `crm_sessoes?select=id_hash` +
+      `&id_hash=eq.${hashToken(token)}` +
+      `&credencial=eq.${impressaoCredencial()}` +
+      `&revogada_em=is.null` +
+      `&expira_em=gt.${encodeURIComponent(agora)}` +
+      `&limit=1`,
+  );
+
+  const linhas = await lerJson<unknown[]>(resposta, "sessao.validar");
+
+  return Array.isArray(linhas) && linhas.length === 1;
 }
 
-export async function sessaoAtiva() {
-  const cookieStore = await cookies();
+/** Versão booleana e fechada: qualquer falha em verificar conta como "não". */
+export async function sessaoAtiva(): Promise<boolean> {
+  try {
+    return await validarSessao();
+  } catch (erro) {
+    registrar("warn", "sessao.validacao_falhou", {
+      categoria: erro instanceof ErroCrm ? erro.categoria : "desconhecida",
+    });
 
-  return tokenValido(cookieStore.get(NOME_COOKIE_SESSAO)?.value);
+    return false;
+  }
 }
