@@ -15,6 +15,7 @@ drop trigger if exists crm_leads_antes_update on public.leads;
 drop function if exists public.crm_leads_depois_update();
 drop function if exists public.crm_leads_antes_update();
 
+drop function if exists public.crm_contagens(timestamptz);
 drop function if exists public.crm_login_ok(text);
 drop function if exists public.crm_login_falha(text);
 drop function if exists public.crm_login_espera(text);

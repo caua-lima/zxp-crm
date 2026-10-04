@@ -261,6 +261,32 @@ as $$
   delete from public.crm_login_tentativas where chave = p_chave;
 $$;
 
+-- ── 4b. Contagens da lista ───────────────────────────────────────────────
+-- Total e contagem por status de TODA a tabela, numa chamada só — é o que faz
+-- os contadores das abas serem verdadeiros, e não "dos 500 mais recentes".
+-- `retornos` = com próxima ação até o fim do dia informado e ainda em aberto.
+create or replace function public.crm_contagens(p_fim_hoje timestamptz)
+returns jsonb
+language sql
+stable
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'total', (select count(*) from public.leads),
+    'por_status', coalesce(
+      (select jsonb_object_agg(status, n)
+         from (select status, count(*) as n from public.leads group by status) s),
+      '{}'::jsonb
+    ),
+    'retornos', (
+      select count(*) from public.leads
+       where proxima_acao_em is not null
+         and proxima_acao_em <= p_fim_hoje
+         and status not in ('fechado', 'perdido')
+    )
+  );
+$$;
+
 -- ── 5. Permissões ────────────────────────────────────────────────────────
 -- Tudo novo nasce fechado: RLS ligado, nenhuma policy, e nenhum privilégio para
 -- as chaves públicas. Só a service_role (servidor) acessa.
@@ -281,9 +307,11 @@ grant select, insert, update, delete on table public.crm_login_tentativas to ser
 revoke all on function public.crm_login_espera(text) from public, anon, authenticated;
 revoke all on function public.crm_login_falha(text) from public, anon, authenticated;
 revoke all on function public.crm_login_ok(text) from public, anon, authenticated;
+revoke all on function public.crm_contagens(timestamptz) from public, anon, authenticated;
 revoke all on function public.crm_leads_antes_update() from public, anon, authenticated;
 revoke all on function public.crm_leads_depois_update() from public, anon, authenticated;
 
 grant execute on function public.crm_login_espera(text) to service_role;
 grant execute on function public.crm_login_falha(text) to service_role;
 grant execute on function public.crm_login_ok(text) to service_role;
+grant execute on function public.crm_contagens(timestamptz) to service_role;

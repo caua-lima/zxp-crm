@@ -343,6 +343,62 @@ describe("crm_0001 — contador de login", () => {
   });
 });
 
+describe("crm_0001 — contagens", () => {
+  let db: PGlite;
+
+  beforeAll(async () => {
+    db = await novoBanco();
+    await db.exec(MIGRATION);
+  });
+
+  beforeEach(async () => {
+    await limpar(db);
+  });
+
+  const contagens = async (fim: string) =>
+    (await db.query<{ c: Record<string, unknown> }>(
+      `select public.crm_contagens($1::timestamptz) as c`,
+      [fim],
+    )).rows[0].c;
+
+  it("tabela vazia devolve zeros, sem erro", async () => {
+    expect(await contagens("2026-10-10T23:59:59Z")).toEqual({
+      total: 0,
+      por_status: {},
+      retornos: 0,
+    });
+  });
+
+  it("conta TODA a tabela, não um recorte (600 leads)", async () => {
+    await db.exec(`
+      insert into public.leads (nome, whatsapp, email, idade, peso, consentimento_em, status)
+      select 'L' || g, '(11) 91234-5678', 'l' || g || '@x.com', '18 a 21', 'Outro', now(),
+             case when g % 3 = 0 then 'novo' when g % 3 = 1 then 'contatado' else 'perdido' end
+      from generate_series(1, 600) g
+    `);
+
+    expect(await contagens("2026-10-10T23:59:59Z")).toEqual({
+      total: 600,
+      por_status: { novo: 200, contatado: 200, perdido: 200 },
+      retornos: 0,
+    });
+  });
+
+  it("retornos: vencidos até o fim do dia, só os que ainda estão em aberto", async () => {
+    await db.exec(`
+      insert into public.leads (nome, whatsapp, email, idade, peso, consentimento_em, status, proxima_acao_em) values
+        ('a', '(11) 91234-5678', 'a@x.com', '18 a 21', 'Outro', now(), 'novo',      '2026-10-10T12:00:00Z'),
+        ('b', '(11) 91234-5678', 'b@x.com', '18 a 21', 'Outro', now(), 'contatado', '2026-10-01T12:00:00Z'),
+        ('c', '(11) 91234-5678', 'c@x.com', '18 a 21', 'Outro', now(), 'novo',      '2026-10-11T12:00:00Z'),
+        ('d', '(11) 91234-5678', 'd@x.com', '18 a 21', 'Outro', now(), 'fechado',   '2026-10-01T12:00:00Z'),
+        ('e', '(11) 91234-5678', 'e@x.com', '18 a 21', 'Outro', now(), 'novo',      null)
+    `);
+
+    const c = await contagens("2026-10-10T23:59:59Z");
+    expect(c.retornos).toBe(2); // a e b; c é amanhã, d está fechado, e não tem retorno
+  });
+});
+
 describe("crm_0001 — permissões", () => {
   let db: PGlite;
 
@@ -377,7 +433,12 @@ describe("crm_0001 — permissões", () => {
   });
 
   it("anon NÃO executa as funções de login; service_role executa", async () => {
-    for (const fn of ["crm_login_falha(text)", "crm_login_espera(text)", "crm_login_ok(text)"]) {
+    for (const fn of [
+      "crm_login_falha(text)",
+      "crm_login_espera(text)",
+      "crm_login_ok(text)",
+      "crm_contagens(timestamptz)",
+    ]) {
       const anon = await db.query<{ ok: boolean }>(
         `select has_function_privilege('anon', $1::regprocedure, 'EXECUTE') as ok`,
         [`public.${fn}`],
