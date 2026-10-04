@@ -58,7 +58,9 @@ export function validarConfiguracao(env: NodeJS.ProcessEnv = process.env): Confi
       const url = new URL(supabaseUrl);
       const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
 
-      if (url.protocol !== "https:" && !(local && !producao())) {
+      // http só para loopback (testes e simulação local): esse tráfego não sai
+      // da máquina. Qualquer host remoto exige https, em qualquer ambiente.
+      if (url.protocol !== "https:" && !local) {
         problemas.push("SUPABASE_URL deve usar https");
       }
 

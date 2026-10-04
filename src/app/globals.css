@@ -10,6 +10,27 @@
   --brand-dourado-claro: #ffd98a;
   --brand-marfim: #f6f3e8;
 
+  /*
+   * Texto: três níveis, com contraste MEDIDO sobre onyx, onyx-raised e os selos
+   * (tests/unit/contraste.test.ts confere todos ≥ 4,5:1 — WCAG AA para texto
+   * pequeno). Não use marfim com opacidade para texto: /25 dava 2,1:1 e /40,
+   * 3,6:1, e a opacidade do pai se multiplica com a do filho.
+   *   texto    → título e conteúdo
+   *   texto-2  → apoio, rótulos
+   *   texto-3  → auxiliar (data, ajuda, placeholder) — o mais apagado permitido
+   */
+  --brand-texto: #f6f3e8;
+  --brand-texto-2: #c4c1b5;
+  --brand-texto-3: #a09d91;
+
+  /*
+   * Borda de CONTROLES (campo, botão secundário, chip). #23211a (onyx-line) tem
+   * 1,18:1 contra o fundo: o campo some. Controles precisam de ~3:1 para serem
+   * identificáveis (WCAG 1.4.11). onyx-line continua valendo para divisórias e
+   * cartões, que são decoração.
+   */
+  --brand-borda: #77756b;
+
   --background: var(--brand-onyx);
   --foreground: var(--brand-marfim);
 }
@@ -21,6 +42,10 @@
   --color-dourado: var(--brand-dourado);
   --color-dourado-claro: var(--brand-dourado-claro);
   --color-marfim: var(--brand-marfim);
+  --color-texto: var(--brand-texto);
+  --color-texto-2: var(--brand-texto-2);
+  --color-texto-3: var(--brand-texto-3);
+  --color-borda: var(--brand-borda);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
@@ -45,6 +70,24 @@ body {
   outline: 2px solid var(--brand-dourado);
   outline-offset: 3px;
   border-radius: 4px;
+}
+
+/* Link "pular para o conteúdo": invisível até receber foco pelo teclado. */
+.pular-conteudo {
+  position: absolute;
+  left: 0.75rem;
+  top: -4rem;
+  z-index: 50;
+  border-radius: 0.5rem;
+  background: var(--brand-dourado);
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  color: var(--brand-onyx);
+  transition: top 0.15s;
+}
+
+.pular-conteudo:focus {
+  top: 0.75rem;
 }
 
 /* ── Utilitários ──────────────────────────────────────────────────── */

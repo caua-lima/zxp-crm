@@ -2,15 +2,11 @@ import Link from "next/link";
 
 export default function NaoEncontrado() {
   return (
-    <main className="flex flex-1 items-center justify-center px-5 py-16">
+    <main id="conteudo" className="flex flex-1 items-center justify-center px-5 py-16">
       <div className="text-center">
-        <h1 className="font-display text-xl font-bold text-marfim">
-          Esse lead não existe
-        </h1>
+        <h1 className="font-display text-xl font-bold text-texto">Esse lead não existe</h1>
 
-        <p className="mt-2 text-sm text-marfim/50">
-          Pode ter sido removido, ou o link está errado.
-        </p>
+        <p className="mt-2 text-sm text-texto-2">Pode ter sido removido, ou o link está errado.</p>
 
         <Link
           href="/"

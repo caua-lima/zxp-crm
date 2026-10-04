@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter } from "next/font/google";
 
+import { marca } from "@/config/marca";
+
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -17,11 +19,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ZXP CRM",
-  description: "Painel de leads da RUMO — ZXP Solutions.",
-  // O painel lista nome, telefone e relato pessoal de menores de idade.
-  // Ele não pode ser indexado em hipótese alguma. O proxy também manda o
-  // cabeçalho X-Robots-Tag, que cobre respostas que nem chegam a renderizar.
+  title: marca.produto,
+  description: `Painel de leads da ${marca.oferta} — ${marca.empresaMae}.`,
+  // O painel lista nome, telefone e relato pessoal de menores de idade. Ele não
+  // pode ser indexado em hipótese alguma. O proxy também manda o cabeçalho
+  // X-Robots-Tag, que cobre respostas que nem chegam a renderizar.
   robots: {
     index: false,
     follow: false,
@@ -41,7 +43,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="pt-BR"
       className={`${spaceGrotesk.variable} ${inter.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-onyx text-marfim">
+      <body className="flex min-h-full flex-col bg-onyx text-texto">
+        <a href="#conteudo" className="pular-conteudo">
+          Pular para o conteúdo
+        </a>
         {children}
       </body>
     </html>

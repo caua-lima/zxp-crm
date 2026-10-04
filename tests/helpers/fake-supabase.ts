@@ -64,7 +64,7 @@ function desaspar(valor: string) {
 }
 
 function lerNo(texto: string): No {
-  const logico = /^(not\.)?(and|or)\((.*)\)$/s.exec(texto);
+  const logico = /^(not\.)?(and|or)\(([\s\S]*)\)$/.exec(texto);
 
   if (logico) {
     return {
@@ -232,14 +232,20 @@ export class FakeSupabase {
   private servidor: Server | null = null;
   private contadorEvento = 1;
 
-  constructor(readonly chave: string) {}
+  readonly chave: string;
 
-  async iniciar(): Promise<string> {
+  // Campo explícito (e não `constructor(readonly chave)`): o scripts/banco-simulado.mjs
+  // roda este arquivo direto no Node, que só REMOVE tipos e não suporta essa sintaxe.
+  constructor(chave: string) {
+    this.chave = chave;
+  }
+
+  async iniciar(porta = 0): Promise<string> {
     this.servidor = createServer((req, res) => {
       void this.tratar(req, res);
     });
 
-    await new Promise<void>((ok) => this.servidor!.listen(0, "127.0.0.1", ok));
+    await new Promise<void>((ok) => this.servidor!.listen(porta, "127.0.0.1", ok));
 
     return `http://127.0.0.1:${(this.servidor.address() as AddressInfo).port}`;
   }
@@ -346,7 +352,7 @@ export class FakeSupabase {
     }
 
     try {
-      this.rotear(req.method ?? "GET", url, corpo, req.headers.prefer ?? "", responder);
+      this.rotear(req.method ?? "GET", url, corpo, String(req.headers.prefer ?? ""), responder);
     } catch (erro) {
       responder(500, { code: "XX000", message: String(erro) });
     }

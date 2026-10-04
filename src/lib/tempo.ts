@@ -174,6 +174,11 @@ export function quandoRetorno(iso: unknown, agora: number = Date.now()): Retorno
   return { texto: `${ddmm(instante, agora)}, ${hhmm(instante)}`, atrasado };
 }
 
+/** "15:04" no horário de São Paulo. */
+export function horaSaoPaulo(instante: number = Date.now()): string {
+  return hhmm(instante);
+}
+
 /** Último instante do dia de hoje em SP, em ISO UTC (para filtrar "retornos de hoje"). */
 export function fimDoDiaSaoPaulo(agora: number = Date.now()): string {
   const p = partesSP(agora);

@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { cookies } from "next/headers";
+import { unstable_rethrow } from "next/navigation";
 
 import { bancoFetch, lerJson } from "./banco";
 import { configuracao } from "./config";
@@ -175,6 +176,10 @@ export async function sessaoAtiva(): Promise<boolean> {
   try {
     return await validarSessao();
   } catch (erro) {
+    // cookies() lança um erro INTERNO do Next para marcar a rota como dinâmica
+    // (e redirect/notFound também). Engolir isso aqui quebraria o framework.
+    unstable_rethrow(erro);
+
     registrar("warn", "sessao.validacao_falhou", {
       categoria: erro instanceof ErroCrm ? erro.categoria : "desconhecida",
     });
