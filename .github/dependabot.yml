@@ -1,0 +1,19 @@
+# Atualizações de dependência chegam como pull request para REVISÃO — nunca
+# entram sozinhas. Next.js e React andam juntos e mudam o que o AGENTS.md avisa
+# ("não é o Next que você conhece"), então cada bump merece leitura.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      next-react:
+        patterns: [next, react, react-dom, eslint-config-next, "@types/react*"]
+      testes:
+        patterns: [vitest, "@electric-sql/pglite", jsdom, "@testing-library/*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

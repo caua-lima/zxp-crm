@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Sem permissão de escrita: este fluxo só lê o código e roda verificações.
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # Pelo lockfile, sem rodar scripts de instalação de dependências.
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - run: npm run lint
+      - run: npm run typecheck
+
+      # Inclui o Postgres embutido (pglite) rodando a migration de verdade.
+      # Nenhum teste fala com o Supabase real: não há credencial neste fluxo.
+      - run: npm test
+
+      # Valores de TESTE, só para o build rodar e para o verificador ter o que
+      # procurar nos arquivos do cliente. Não são segredos.
+      - name: Build
+        run: npm run build
+        env:
+          SUPABASE_URL: http://127.0.0.1:54321
+          SUPABASE_SERVICE_ROLE_KEY: sb_secret_chave-so-de-teste-0123456789
+          ADMIN_PASSWORD: senha-de-teste-bem-longa
+          AUTH_SECRET: abcdefghijklmnopqrstuvwxyz0123456789ABCD
+
+      - name: Nenhum segredo no bundle do cliente
+        run: npm run verificar:bundle
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: sb_secret_chave-so-de-teste-0123456789
+          ADMIN_PASSWORD: senha-de-teste-bem-longa
+          AUTH_SECRET: abcdefghijklmnopqrstuvwxyz0123456789ABCD
+
+      # Produção (o que vai ao ar): falha o fluxo se houver vulnerabilidade ALTA
+      # ou crítica. A cadeia de ferramentas do ESLint tem avisos conhecidos que
+      # só afetam lint — ver docs/OPERACAO.md — e por isso fica de fora.
+      - run: npm audit --omit=dev --audit-level=high

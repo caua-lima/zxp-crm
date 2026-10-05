@@ -10,7 +10,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "verificar:bundle": "node scripts/verificar-bundle.mjs",
-    "banco:simulado": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/banco-simulado.mjs"
+    "banco:simulado": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/banco-simulado.mjs",
+    "sessoes:encerrar": "node --env-file=.env.local scripts/encerrar-sessoes.mjs"
   },
   "dependencies": {
     "next": "16.3.8",
